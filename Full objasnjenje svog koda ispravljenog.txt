@@ -1,0 +1,1269 @@
+Наравно! Ево **потпуног детаљног објашњења** читавог кода, класу по класу, са свим изменама и српским преводима.
+
+---
+
+# 📚 **ДЕТАЉНО ОБЈАШЊЕЊЕ СВИХ КЛАСА**
+
+## 🎯 **ПРЕГЛЕД АРХИТЕКТУРЕ**
+
+Наша апликација има **10 класа** подељених у 3 нивоа:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      PRESENTATION LAYER                     │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │  Main.java  │  │DrawingApp.java│  │ ModifyDialog.java  │ │
+│  │ (покретач)  │  │ (главни прозор)│  │  (дијалог за измену)│ │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+├─────────────────────────────────────────────────────────────┤
+│                       LOGIC LAYER                           │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │                   PnlDrawing.java                     │  │
+│  │         (цртање, селекција, померање, resize)        │  │
+│  └──────────────────────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│                       MODEL LAYER                           │
+│  ┌─────────┐ ┌─────────┐ ┌────────────┐ ┌──────────────┐  │
+│  │ Shape.java│PointShape│ LineShape │RectangleShape│  │
+│  └─────────┘ └─────────┘ └────────────┘ └──────────────┘  │
+│  ┌──────────┐ ┌─────────────────┐                         │
+│  │CircleShape│HollowCircleShape│                         │
+│  └──────────┘ └─────────────────┘                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+# 1️⃣ **MAIN.JAVA - ПОКРЕТАЧ АПЛИКАЦИЈЕ**
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        new DrawingApp().setVisible(true);
+    }
+}
+```
+
+### **Објашњење:**
+
+| Код | Шта ради |
+|-----|----------|
+| `public class Main` | Дефинише јавну класу Main |
+| `public static void main(String[] args)` | Главни метод - улазна тачка програма |
+| `new DrawingApp()` | Креира нову инстанцу главног прозора |
+| `.setVisible(true)` | Приказује прозор на екрану |
+
+**Зашто овако?** Java захтева да свака апликација има `main` метод. Овде само правимо прозор и приказујемо га.
+
+---
+
+# 2️⃣ **SHAPE.JAVA - АПСТРАКТНА БАЗНА КЛАСА**
+
+```java
+import java.awt.*;
+
+public abstract class Shape {
+    protected Color borderColor = Color.BLACK;
+    protected Color fillColor = new Color(0, 0, 0, 0);
+    
+    public Shape() {}
+    
+    public Shape(Color borderColor, Color fillColor) {
+        this.borderColor = borderColor;
+        this.fillColor = fillColor;
+    }
+    
+    public abstract boolean contains(int x, int y);
+    public abstract Rectangle getBounds();
+    public abstract Shape copy();
+    public abstract String getProperties();
+    public abstract void updateProperties(String[] values);
+    
+    public Color getBorderColor() { return borderColor; }
+    public void setBorderColor(Color borderColor) { this.borderColor = borderColor; }
+    public Color getFillColor() { return fillColor; }
+    public void setFillColor(Color fillColor) { this.fillColor = fillColor; }
+}
+```
+
+### **Објашњење по деловима:**
+
+#### **Заштићене (protected) променљиве:**
+```java
+protected Color borderColor = Color.BLACK;        // боја ивице - подразумевано црна
+protected Color fillColor = new Color(0, 0, 0, 0); // боја испуне - подразумевано провидна
+```
+
+- `protected` - доступно свим класама у истом пакету и класама које наслеђују
+- `Color.BLACK` - црна боја
+- `new Color(0,0,0,0)` - провидна боја (четврти параметар 0 = потпуно провидно)
+
+#### **Конструктори (Overloading - преоптерећење):**
+```java
+public Shape() {}  // празан конструктор - користи подразумеване боје
+
+public Shape(Color borderColor, Color fillColor) {  // конструктор са бојама
+    this.borderColor = borderColor;
+    this.fillColor = fillColor;
+}
+```
+
+**Зашто два конструктора?** Омогућава флексибилност - можемо направити облик са подразумеваним бојама или са специфичним.
+
+#### **Апстрактне методе (морају се имплементирати у изведеним класама):**
+
+| Метода | Шта ради | Зашто је апстрактна? |
+|--------|----------|---------------------|
+| `contains(x,y)` | Проверава да ли је тачка унутар облика | Сваки облик има другачију геометрију |
+| `getBounds()` | Враћа правоугаони оквир облика | Сваки облик има другачије димензије |
+| `copy()` | Прави дубоку копију облика | Сваки облик има различите податке |
+| `getProperties()` | Враћа својства као String | Сваки облик има различита својства |
+| `updateProperties()` | Ажурира својства из низа | Сваки облик има различита својства |
+
+#### **Getteri и Setteri:**
+```java
+public Color getBorderColor() { return borderColor; }     // враћа боју ивице
+public void setBorderColor(Color borderColor) { this.borderColor = borderColor; }  // поставља боју ивице
+public Color getFillColor() { return fillColor; }         // враћа боју испуне
+public void setFillColor(Color fillColor) { this.fillColor = fillColor; }  // поставља боју испуне
+```
+
+**Енкапсулација:** Подаци су `protected`, а приступ преко `public` метода.
+
+---
+
+# 3️⃣ **POINTSHAPE.JAVA - ТАЧКА**
+
+```java
+import java.awt.*;
+
+public class PointShape extends Shape {
+    private int x, y;
+    
+    public PointShape(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+    
+    public PointShape(int x, int y, Color borderColor, Color fillColor) {
+        super(borderColor, fillColor);
+        this.x = x;
+        this.y = y;
+    }
+    
+    public int getX() { return x; }
+    public void setX(int x) { this.x = x; }
+    public int getY() { return y; }
+    public void setY(int y) { this.y = y; }
+    
+    @Override
+    public boolean contains(int px, int py) {
+        return Math.abs(px - x) <= 5 && Math.abs(py - y) <= 5;
+    }
+    
+    @Override
+    public Rectangle getBounds() {
+        return new Rectangle(x - 6, y - 6, 12, 12);
+    }
+    
+    @Override
+    public Shape copy() {
+        return new PointShape(x, y, borderColor, fillColor);
+    }
+    
+    @Override
+    public String getProperties() {
+        return "Tačka|X:" + x + "|Y:" + y;
+    }
+    
+    @Override
+    public void updateProperties(String[] values) {
+        if (values.length >= 2) {
+            this.x = Integer.parseInt(values[0]);
+            this.y = Integer.parseInt(values[1]);
+        }
+    }
+}
+```
+
+### **Објашњење:**
+
+#### **Наслеђивање:**
+```java
+public class PointShape extends Shape
+```
+- `extends Shape` - наслеђује све из Shape класе (боје, getteri, setteri)
+
+#### **Приватне променљиве:**
+```java
+private int x, y;  // координате тачке
+```
+
+#### **Конструктори:**
+```java
+public PointShape(int x, int y)                           // само координате
+public PointShape(int x, int y, Color border, Color fill) // координате + боје
+```
+
+#### **Метода contains (провера да ли је клик на тачки):**
+```java
+return Math.abs(px - x) <= 5 && Math.abs(py - y) <= 5;
+```
+- `Math.abs(px - x)` - растојање по X оси (апсолутна вредност)
+- `<= 5` - ако је удаљено мање од 5 пиксела, сматра се да је клик на тачки
+
+**Визуелно:**
+```
+    0   1   2   3   4   5
+  ┌───┬───┬───┬───┬───┬───┐
+0 │   │   │   │   │   │   │
+1 │   │   │   │   │   │   │
+2 │   │   │   │   │   │   │
+3 │   │   │  ●│   │   │   │  ← тачка на (3,3)
+4 │   │   │   │   │   │   │
+5 │   │   │   │   │   │   │
+  └───┴───┴───┴───┴───┴───┘
+  
+Кликови унутар 5px радијуса ће селектовати тачку
+```
+
+#### **Метода getBounds:**
+```java
+return new Rectangle(x - 6, y - 6, 12, 12);
+```
+- Враћа квадрат 12x12 пиксела центриран око тачке
+- Користи се за приказ селекционог оквира
+
+---
+
+# 4️⃣ **LINESHAPE.JAVA - ЛИНИЈА**
+
+```java
+import java.awt.*;
+
+public class LineShape extends Shape {
+    private int x1, y1, x2, y2;
+    
+    public LineShape(int x1, int y1, int x2, int y2) {
+        this.x1 = x1; this.y1 = y1;
+        this.x2 = x2; this.y2 = y2;
+    }
+    
+    public LineShape(int x1, int y1, int x2, int y2, Color borderColor, Color fillColor) {
+        super(borderColor, fillColor);
+        this.x1 = x1; this.y1 = y1;
+        this.x2 = x2; this.y2 = y2;
+    }
+    
+    // Getteri i Setteri...
+    
+    @Override
+    public boolean contains(int px, int py) {
+        double dist = pointToLineDistance(px, py, x1, y1, x2, y2);
+        return dist <= 6;
+    }
+    
+    private double pointToLineDistance(int px, int py, int x1, int y1, int x2, int y2) {
+        double area = Math.abs((x2 - x1) * (py - y1) - (px - x1) * (y2 - y1));
+        double length = Math.sqrt((x2 - x1)*(x2 - x1) + (y2 - y1)*(y2 - y1));
+        if (length == 0) return Math.sqrt((px - x1)*(px - x1) + (py - y1)*(py - y1));
+        return area / length;
+    }
+    
+    @Override
+    public String getProperties() {
+        return "Linija|X1:" + x1 + "|Y1:" + y1 + "|X2:" + x2 + "|Y2:" + y2;
+    }
+}
+```
+
+### **Објашњење математике за растојање тачке од линије:**
+
+**Формула:**
+```
+Растојање = |(x2-x1)*(y1-py) - (x1-px)*(y2-y1)| / √((x2-x1)² + (y2-y1)²)
+```
+
+**Визуелно објашњење:**
+```
+        (x1,y1)●
+              /|
+             / | ← растојање
+            /  |
+           /   |
+    (px,py)●   |
+               |
+        (x2,y2)●
+```
+
+**Зашто овако?** Омогућава да кликнемо близу линије (6 пиксела) и да се линија селектује, чак и ако нисмо погодили тачно на линију.
+
+---
+
+# 5️⃣ **RECTANGLESHAPE.JAVA - ПРАВОУГАОНИК**
+
+```java
+public class RectangleShape extends Shape {
+    private int x, y, width, height;
+    
+    @Override
+    public boolean contains(int px, int py) {
+        return px >= x && px <= x + width && py >= y && py <= y + height;
+    }
+    
+    @Override
+    public Rectangle getBounds() {
+        return new Rectangle(x - 3, y - 3, width + 6, height + 6);
+    }
+    
+    @Override
+    public String getProperties() {
+        return "Pravougaonik|X:" + x + "|Y:" + y + "|Širina:" + width + "|Visina:" + height;
+    }
+}
+```
+
+### **Објашњење:**
+
+**Метода contains:**
+```java
+px >= x && px <= x + width && py >= y && py <= y + height
+```
+- Проверава да ли је X координата клика између леве и десне ивице
+- Проверава да ли је Y координата клика између горње и доње ивице
+
+**Визуелно:**
+```
+        x                    x+width
+         ↓                      ↓
+    (x,y)● ┌──────────────────┐
+          │                  │
+          │      (px,py)●     │  ← клик унутар правоугаоника
+          │                  │
+          └──────────────────┘ ● (x+width, y+height)
+```
+
+---
+
+# 6️⃣ **CIRCLESHAPE.JAVA - КРУГ**
+
+```java
+public class CircleShape extends Shape {
+    private int x, y, radius;
+    
+    @Override
+    public boolean contains(int px, int py) {
+        double dist = Math.sqrt((px - x)*(px - x) + (py - y)*(py - y));
+        return dist <= radius;
+    }
+    
+    @Override
+    public String getProperties() {
+        return "Krug|X:" + x + "|Y:" + y + "|Poluprečnik:" + radius;
+    }
+}
+```
+
+### **Објашњење математике:**
+
+**Питагорина теорема:**
+```
+Растојање = √((px-x)² + (py-y)²)
+```
+
+**Визуелно:**
+```
+           ● (x,y) - центар
+          /|
+         / | ← radius
+        /  |
+    (px,py)●
+    
+Ако је растојање ≤ radius, тачка је у кругу
+```
+
+---
+
+# 7️⃣ **HOLLOWCIRCLESHAPE.JAVA - КРУГ СА РУПОМ**
+
+```java
+public class HollowCircleShape extends Shape {
+    private int x, y, outerRadius, innerRadius;
+    
+    @Override
+    public boolean contains(int px, int py) {
+        double dist = Math.sqrt((px - x)*(px - x) + (py - y)*(py - y));
+        return dist <= outerRadius && dist >= innerRadius;
+    }
+    
+    @Override
+    public String getProperties() {
+        return "Krug sa rupom|X:" + x + "|Y:" + y + "|Spoljašnji:" + outerRadius + "|Unutrašnji:" + innerRadius;
+    }
+}
+```
+
+### **Објашњење:**
+
+**Услов за селекцију:**
+```java
+dist <= outerRadius && dist >= innerRadius
+```
+- `dist <= outerRadius` - тачка мора бити унутар спољашњег круга
+- `dist >= innerRadius` - тачка мора бити изван унутрашњег круга
+
+**Визуелно:**
+```
+        ╭─────────────────╮
+       ╱                   ╲
+      │      ┌─────┐        │
+      │      │     │        │  ← рупа (не може се селектовати)
+      │      │  ●  │        │  ← селектује се само овде
+      │      └─────┘        │
+       ╲                   ╱
+        ╰─────────────────╯
+```
+
+---
+
+# 8️⃣ **PNLDRAWING.JAVA - ПАНЕЛ ЗА ЦРТАЊЕ (НАЈВАЖНИЈА КЛАСА)**
+
+Ово је најкомплекснија класа. Поделићу је на делове:
+
+## **ДЕО 1: ПРОМЕНЉИВЕ И КОНСТРУКТОР**
+
+```java
+public class PnlDrawing extends JPanel {
+    private ArrayList<Shape> shapes = new ArrayList<>();     // листа свих облика
+    private Shape selectedShape = null;                      // тренутно селектован облик
+    private boolean isSelectionMode = false;                 // да ли смо у режиму селекције
+    private float selectionAnimation = 0;                    // за анимирани border (0 до 2π)
+    private Timer animationTimer;                            // тајмер за анимацију
+    
+    // За трансформацију (померање/развлачење)
+    private boolean isDragging = false;       // да ли се тренутно вуче облик
+    private int dragStartX, dragStartY;       // почетна позиција вучења
+    private int originalX, originalY, originalWidth, originalHeight;  // оригиналне вредности
+    private int resizeHandle = -1;            // који угао се вуче (-1 = ниједан, 0-3 = углови)
+    private boolean isResizing = false;       // да ли се тренутно мења величина
+    private String selectedShapeType = "";    // тип селектованог облика
+    
+    private final int HANDLE_SIZE = 10;       // величина контролних тачака (у пикселима)
+```
+
+### **Шта је ArrayList?**
+- Динамичка листа која може да расте
+- Чува све нацртане облике
+- `shapes.add(shape)` - додаје облик на крај листе
+- `shapes.remove(shape)` - уклања облик
+
+### **Шта је Timer?**
+```java
+animationTimer = new Timer(true);
+animationTimer.scheduleAtFixedRate(new TimerTask() {
+    @Override
+    public void run() {
+        if (selectedShape != null) {
+            selectionAnimation = (selectionAnimation + 0.1f) % (float)(2 * Math.PI);
+            repaint();
+        }
+    }
+}, 0, 100);
+```
+- Покреће задатак сваких 100 милисекунди (10 пута у секунди)
+- `selectionAnimation` се повећава за 0.1 радијан
+- Када достигне `2π` (пун круг), враћа се на 0
+- `repaint()` позива поновно цртање, што ствара анимацију
+
+---
+
+## **ДЕО 2: ФУНКЦИОНАЛНИ ИНТЕРФЕЈС ЗА ЦРТАЊЕ**
+
+```java
+@FunctionalInterface
+public interface DrawCommand {
+    void draw(Graphics2D g2d, Shape shape);
+}
+```
+
+**Шта је функционални интерфејс?**
+- Интерфејс са **тачно једном** апстрактном методом
+- Може се користити са ламбда изразима
+
+**Зашто овако?** Омогућава да сваки облик има своју имплементацију цртања, али да се метод `draw` позива само унутар `PnlDrawing` (испуњава услов задатка).
+
+### **Ламбда имплементације:**
+
+```java
+private DrawCommand pointDraw = (g2d, s) -> {
+    PointShape p = (PointShape) s;
+    g2d.setColor(p.getFillColor());
+    g2d.fill(new Ellipse2D.Float(p.getX() - 4, p.getY() - 4, 9, 9));
+    g2d.setColor(p.getBorderColor());
+    g2d.setStroke(new BasicStroke(2));
+    g2d.draw(new Ellipse2D.Float(p.getX() - 4, p.getY() - 4, 9, 9));
+};
+```
+
+**Објашњење ламбда синтаксе:**
+```java
+(параметри) -> { тело методе }
+```
+- `(g2d, s)` - параметри (Graphics2D и Shape)
+- `->` - стрелица која раздваја параметре од тела
+- `{ ... }` - тело методе
+
+**Шта ради pointDraw:**
+1. `g2d.setColor(p.getFillColor())` - поставља боју испуне
+2. `g2d.fill(new Ellipse2D.Float(...))` - црта попуњен круг (тачку)
+3. `g2d.setColor(p.getBorderColor())` - поставља боју ивице
+4. `g2d.draw(new Ellipse2D.Float(...))` - црта само ивицу круга
+
+---
+
+## **ДЕО 3: МЕТОДЕ ЗА УПРАВЉАЊЕ ОБЛИЦИМА**
+
+```java
+public void addShape(Shape shape) {
+    shapes.add(shape);      // додаје облик у листу
+    selectedShape = shape;  // аутоматски га селектује
+    repaint();              // прецртава панел
+}
+
+public void selectShapeAt(int x, int y) {
+    for (int i = shapes.size() - 1; i >= 0; i--) {  // идемо ОД ПОСЛЕДЊЕГ ка првом
+        if (shapes.get(i).contains(x, y)) {
+            selectedShape = shapes.get(i);  // селектуј први пронађени
+            repaint();
+            return;
+        }
+    }
+    selectedShape = null;  // ништа није селектовано
+    repaint();
+}
+```
+
+**Зашто идемо од последњег ка првом?**
+- Последњи нацртан облик је на крају листе
+- Ако кликнемо на пресек два облика, желимо да селектујемо последњи нацртан
+- Ово испуњава услов задатка: *"Уколико се при селекцији кликне на пресек два објекта потребно је селектовати САМО последњи нацртан објекат"*
+
+---
+
+## **ДЕО 4: МЕТОДЕ ЗА ПОМЕРАЊЕ (DRAG AND DROP)**
+
+```java
+public void handleMousePress(int x, int y) {
+    if (!isSelectionMode) return;  // само у Select режиму
+    
+    // Прво провери да ли је клик на неком од углова (за resize)
+    if (selectedShape != null) {
+        resizeHandle = getResizeHandleAt(x, y);
+        if (resizeHandle != -1) {
+            isResizing = true;
+            saveOriginalValues();  // сачувај оригиналне вредности
+            dragStartX = x;
+            dragStartY = y;
+            return;
+        }
+    }
+    
+    // Ако није на углу, провери да ли је клик на облику (за померање)
+    for (int i = shapes.size() - 1; i >= 0; i--) {
+        if (shapes.get(i).contains(x, y)) {
+            selectedShape = shapes.get(i);
+            isDragging = true;
+            dragStartX = x;
+            dragStartY = y;
+            repaint();
+            return;
+        }
+    }
+    
+    selectedShape = null;
+    repaint();
+}
+```
+
+**Алгоритам померања:**
+```
+1. Корисник кликне на облик
+2. Запамтимо почетну позицију (dragStartX, dragStartY)
+3. Корисник помера миш
+4. Израчунамо разлику: deltaX = тренутниX - почетниX
+5. Померимо облик за deltaX, deltaY
+6. Ажурирамо почетну позицију
+7. Прецртамо (repaint)
+```
+
+```java
+private void moveShape(int currentX, int currentY) {
+    int deltaX = currentX - dragStartX;  // колико се миш померио по X
+    int deltaY = currentY - dragStartY;  // колико се миш померио по Y
+    
+    if (selectedShape instanceof PointShape) {
+        PointShape p = (PointShape) selectedShape;
+        p.setX(p.getX() + deltaX);
+        p.setY(p.getY() + deltaY);
+    } else if (selectedShape instanceof RectangleShape) {
+        RectangleShape r = (RectangleShape) selectedShape;
+        r.setX(r.getX() + deltaX);
+        r.setY(r.getY() + deltaY);
+    }
+    // ... слични блокови за друге облике
+    
+    dragStartX = currentX;  // ажурирамо почетну позицију за следећи корак
+    dragStartY = currentY;
+}
+```
+
+---
+
+## **ДЕО 5: МЕТОДЕ ЗА РАЗВЛАЧЕЊЕ (RESIZE)**
+
+```java
+private void resizeShape(int currentX, int currentY) {
+    int deltaX = currentX - dragStartX;
+    int deltaY = currentY - dragStartY;
+    
+    if (selectedShape instanceof RectangleShape) {
+        RectangleShape r = (RectangleShape) selectedShape;
+        int newX = originalX;
+        int newY = originalY;
+        int newWidth = originalWidth;
+        int newHeight = originalHeight;
+        
+        switch (resizeHandle) {
+            case 0: // горњи леви угао
+                newX = originalX + deltaX;
+                newY = originalY + deltaY;
+                newWidth = originalWidth - deltaX;
+                newHeight = originalHeight - deltaY;
+                break;
+            case 1: // горњи десни угао
+                newY = originalY + deltaY;
+                newWidth = originalWidth + deltaX;
+                newHeight = originalHeight - deltaY;
+                break;
+            case 2: // доњи леви угао
+                newX = originalX + deltaX;
+                newWidth = originalWidth - deltaX;
+                newHeight = originalHeight + deltaY;
+                break;
+            case 3: // доњи десни угао
+                newWidth = originalWidth + deltaX;
+                newHeight = originalHeight + deltaY;
+                break;
+        }
+        
+        if (newWidth > 10 && newHeight > 10) {  // минимална величина
+            r.setX(newX);
+            r.setY(newY);
+            r.setWidth(newWidth);
+            r.setHeight(newHeight);
+        }
+    }
+}
+```
+
+**Визуелно објашњење за угао 0 (горњи леви):**
+```
+Пре развлачења:
+    originalX=100, originalY=100
+    originalWidth=200, originalHeight=150
+    
+    ┌─────────────────────┐ (100,100)
+    │                     │
+    │                     │
+    │                     │
+    │                     │
+    └─────────────────────┘ (300,250)
+
+После вучења за 50px удесно и 30px доле:
+    newX = 100 + 50 = 150
+    newY = 100 + 30 = 130
+    newWidth = 200 - 50 = 150
+    newHeight = 150 - 30 = 120
+    
+    (150,130) ┌───────────┐
+              │           │
+              │           │
+              └───────────┘ (300,250)
+```
+
+---
+
+## **ДЕО 6: ОТКРИВАЊЕ КОЈИ УГАО ЈЕ КЛИКНУТ**
+
+```java
+private int getResizeHandleAt(int x, int y) {
+    if (selectedShape == null) return -1;
+    
+    Rectangle bounds = selectedShape.getBounds();
+    int handleZone = HANDLE_SIZE + 4;  // 14 пиксела (лакше за клик)
+    
+    // Горњи леви угао
+    if (x >= bounds.x - handleZone/2 && x <= bounds.x + handleZone/2 &&
+        y >= bounds.y - handleZone/2 && y <= bounds.y + handleZone/2) {
+        return 0;
+    }
+    // Горњи десни угао
+    if (x >= bounds.x + bounds.width - handleZone/2 && x <= bounds.x + bounds.width + handleZone/2 &&
+        y >= bounds.y - handleZone/2 && y <= bounds.y + handleZone/2) {
+        return 1;
+    }
+    // ... сличне провере за остале углове
+    
+    return -1;
+}
+```
+
+**Визуелно:**
+```
+        handleZone=14px
+    ←──────────────────→
+    ┌──────────────────┐ ↑
+    │ ████████         │ │ handleZone/2=7px
+    │ ████████         │ ↓
+    │                  │
+    │                  │
+    └──────────────────┘
+    
+█ = зона детекције за угао (14x14 пиксела)
+```
+
+---
+
+## **ДЕО 7: ЦРТАЊЕ (PAINTCOMPONENT)**
+
+```java
+@Override
+protected void paintComponent(Graphics g) {
+    super.paintComponent(g);  // прво исцртај позадину
+    Graphics2D g2d = (Graphics2D) g;
+    
+    // Anti-aliasing - за глатке ивице
+    g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+    g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+    
+    drawGrid(g2d);  // црта позадинску мрежу
+    
+    // Црта све облике
+    for (Shape shape : shapes) {
+        if (shape instanceof PointShape) pointDraw.draw(g2d, shape);
+        else if (shape instanceof LineShape) lineDraw.draw(g2d, shape);
+        else if (shape instanceof RectangleShape) rectDraw.draw(g2d, shape);
+        else if (shape instanceof CircleShape) circleDraw.draw(g2d, shape);
+        else if (shape instanceof HollowCircleShape) hollowDraw.draw(g2d, shape);
+    }
+    
+    // Ако је неки облик селектован, црта анимирани border
+    if (selectedShape != null) {
+        drawAnimatedSelectionBorder(g2d, selectedShape);
+    }
+}
+```
+
+**Шта је Graphics2D?**
+- Напреднија верзија Graphics класе
+- Омогућава:
+  - Дебљину линије (`setStroke`)
+  - Anti-aliasing (глатке ивице)
+  - Ротацију, транслацију, скалирање
+
+**Шта је instanceof?**
+- Оператор који проверава да ли је облик одређеног типа
+- `shape instanceof PointShape` - да ли је shape тачка?
+
+---
+
+## **ДЕО 8: ПОЗАДИНСКА МРЕЖА (GRID)**
+
+```java
+private void drawGrid(Graphics2D g2d) {
+    g2d.setColor(new Color(220, 220, 230));  // светлосива боја
+    g2d.setStroke(new BasicStroke(0.5f));    // веома танка линија
+    
+    // Линије на сваких 20 пиксела
+    for (int x = 0; x < getWidth(); x += 20) {
+        g2d.drawLine(x, 0, x, getHeight());  // вертикалне линије
+    }
+    for (int y = 0; y < getHeight(); y += 20) {
+        g2d.drawLine(0, y, getWidth(), y);   // хоризонталне линије
+    }
+    
+    // Дебље линије на сваких 100 пиксела
+    g2d.setColor(new Color(200, 200, 210));
+    g2d.setStroke(new BasicStroke(1.0f));
+    for (int x = 0; x < getWidth(); x += 100) {
+        g2d.drawLine(x, 0, x, getHeight());
+    }
+    for (int y = 0; y < getHeight(); y += 100) {
+        g2d.drawLine(0, y, getWidth(), y);
+    }
+}
+```
+
+**Зашто мрежа?**
+- Олакшава прецизно позиционирање облика
+- Даје "професионалан" изглед
+- Помаже кориснику да процени димензије
+
+---
+
+## **ДЕО 9: АНИМИРАНИ СЕЛЕКЦИОНИ BORDER**
+
+```java
+private void drawAnimatedSelectionBorder(Graphics2D g2d, Shape shape) {
+    Rectangle bounds = shape.getBounds();
+    
+    // Израчунавање транспарентности на основу анимације
+    float alpha = 0.5f + (float)(Math.sin(selectionAnimation) * 0.3f);
+    // sin(selectionAnimation) се мења од -1 до 1
+    // alpha се мења од 0.2 до 0.8
+    
+    // Спољни сјај (glow) са транспарентношћу
+    g2d.setColor(new Color(70, 130, 200, (int)(alpha * 100)));
+    g2d.setStroke(new BasicStroke(4));
+    g2d.drawRect(bounds.x - 3, bounds.y - 3, bounds.width + 6, bounds.height + 6);
+    
+    // Главни border (плава боја, дебљина 2px)
+    g2d.setColor(new Color(70, 130, 200));
+    g2d.setStroke(new BasicStroke(2));
+    g2d.drawRect(bounds.x - 2, bounds.y - 2, bounds.width + 4, bounds.height + 4);
+    
+    // Контролне тачке за развлачење (бели квадратићи са плавим оквиром)
+    int handleSize = HANDLE_SIZE;
+    int offset = handleSize / 2;
+    
+    g2d.setColor(Color.WHITE);
+    g2d.fillRect(bounds.x - offset, bounds.y - offset, handleSize, handleSize);      // горњи леви
+    g2d.fillRect(bounds.x + bounds.width - offset, bounds.y - offset, handleSize, handleSize);  // горњи десни
+    g2d.fillRect(bounds.x - offset, bounds.y + bounds.height - offset, handleSize, handleSize); // доњи леви
+    g2d.fillRect(bounds.x + bounds.width - offset, bounds.y + bounds.height - offset, handleSize, handleSize); // доњи десни
+    
+    g2d.setColor(new Color(70, 130, 200));
+    g2d.drawRect(bounds.x - offset, bounds.y - offset, handleSize, handleSize);
+    g2d.drawRect(bounds.x + bounds.width - offset, bounds.y - offset, handleSize, handleSize);
+    g2d.drawRect(bounds.x - offset, bounds.y + bounds.height - offset, handleSize, handleSize);
+    g2d.drawRect(bounds.x + bounds.width - offset, bounds.y + bounds.height - offset, handleSize, handleSize);
+}
+```
+
+**Како ради alpha (транспарентност):**
+```java
+Math.sin(selectionAnimation)  // вредност између -1 и 1
+Math.sin(selectionAnimation) * 0.3f  // вредност између -0.3 и 0.3
+0.5f + горе  // вредност између 0.2 и 0.8
+```
+
+Када је alpha = 0.2 → веома провидан сјај
+Када је alpha = 0.8 → скоро потпуно видљив сјај
+Ово ствара ефекат "треперења" селекционог оквира
+
+---
+
+# 9️⃣ **MODIFYDIALOG.JAVA - ДИЈАЛОГ ЗА ИЗМЕНУ**
+
+```java
+public class ModifyDialog extends JDialog {
+    private Shape original, modified;      // оригинал и копија облика
+    private PnlDrawing drawingPanel;       // референца на панел за цртање
+    private JTextField[] fields;           // поља за унос вредности
+    private Color borderColor, fillColor;  // тренутне боје
+    private JButton btnBorder, btnFill, btnOk, btnCancel;
+    
+    public ModifyDialog(Frame owner, Shape shape, PnlDrawing drawingPanel) {
+        super(owner, "Izmena oblika", true);  // true = модалан дијалог
+        this.original = shape;
+        this.modified = shape.copy();         // правимо копију
+        this.drawingPanel = drawingPanel;
+        this.borderColor = shape.getBorderColor();
+        this.fillColor = shape.getFillColor();
+        
+        initComponents();  // креирање GUI компоненти
+    }
+    
+    private void saveChanges() {
+        try {
+            String[] values = new String[fields.length];
+            for (int i = 0; i < fields.length; i++)
+                values[i] = fields[i].getText();  // читамо вредности из поља
+            
+            modified.updateProperties(values);      // ажурирамо копију
+            modified.setBorderColor(borderColor);
+            modified.setFillColor(fillColor);
+            
+            drawingPanel.updateShape(original, modified);  // замењујемо у панелу
+            dispose();  // затварамо дијалог
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Neispravan unos!");
+        }
+    }
+}
+```
+
+### **Шта је модалан дијалог?**
+- `super(owner, "Izmena oblika", true)` - трећи параметар `true` значи модалан
+- Модалан дијалог **блокира главни прозор** док се не затвори
+- Корисник мора да заврши измену или откаже пре него што настави
+
+### **Зашто правимо копију?**
+```java
+this.modified = shape.copy();
+```
+- Ако корисник кликне **Cancel**, оригинал остаје непромењен
+- Ако корисник кликне **OK**, замењујемо оригинал са копијом
+- Ово је "Redo/Undo" pattern на једноставном нивоу
+
+### **JColorChooser (избор боја):**
+```java
+Color c = JColorChooser.showDialog(this, "Izaberi boju ivice", borderColor);
+```
+- Отвара стандардни Windows/Mac дијалог за избор боја
+- Враћа `null` ако корисник откаже
+- Иначе враћа изабрану боју
+
+---
+
+# 🔟 **DRAWINGAPP.JAVA - ГЛАВНИ ПРОЗОР**
+
+Ово је највећа класа. Поделићу је на кључне делове:
+
+## **ДЕО 1: ПРОМЕНЉИВЕ**
+
+```java
+public class DrawingApp extends JFrame {
+    private PnlDrawing drawingPanel;           // панел за цртање
+    private String currentTool = "Tačka";      // тренутни алат
+    private ArrayList<Point> linePoints = new ArrayList<>();  // за линију (2 клика)
+    private JLabel lblStatus, lblShapeInfo;    // статусне поруке
+    private JPanel toolPanel;                  // панел са алаткама
+    private JButton[] toolButtons;             // низ дугмади алатки
+    
+    // ЗЕЛЕНЕ БОЈЕ ЗА ИНТЕРФЕЈС
+    private final Color GREEN_COLOR = new Color(217, 245, 213);      // основна зелена
+    private final Color GREEN_DARK = new Color(180, 220, 170);       // тамнија (hover)
+    private final Color GREEN_SELECTED = new Color(150, 210, 130);   // још тамнија (селектовано)
+    
+    // ТРЕНУТНЕ БОЈЕ ЗА ЦРТАЊЕ
+    private Color currentBorderColor = Color.BLACK;      // тренутна боја ивице
+    private Color currentFillColor = new Color(0, 0, 0, 0);  // тренутна боја испуне (провидно)
+    private JButton btnBorderColor, btnFillColor;        // дугмад за избор боја
+}
+```
+
+## **ДЕО 2: КОНСТРУКТОР**
+
+```java
+public DrawingApp() {
+    setTitle("Profesionalna Aplikacija za Crtanje");  // наслов прозора
+    setSize(1300, 850);                               // величина прозора
+    setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);   // затвара апликацију при клику на X
+    setLocationRelativeTo(null);                      // центрирање на екрану
+    setLayout(new BorderLayout());                    // распоред компоненти
+    
+    // Подешавање изгледа (Look and Feel) - изглед као нативна апликација
+    try {
+        UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+    
+    initComponents();        // креирање GUI компоненти
+    setupKeyboardShortcuts(); // подешавање тастатурних пречица
+}
+```
+
+**BorderLayout распоред:**
+```
+┌─────────────────────────────────────────────┐
+│                   NORTH                     │
+├─────────┬───────────────────────────────────┤
+│         │                                   │
+│  WEST   │              CENTER               │
+│         │                                   │
+├─────────┴───────────────────────────────────┤
+│                   SOUTH                     │
+└─────────────────────────────────────────────┘
+```
+
+## **ДЕО 3: TOP TOOLBAR (ГОРЊА ТРАКА)**
+
+```java
+private JPanel createTopToolbar() {
+    JPanel topPanel = new JPanel(new BorderLayout());
+    topPanel.setBackground(new Color(240, 240, 245));
+    
+    // ЛЕВИ ДЕО - палета боја
+    JPanel colorPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+    colorPanel.setBorder(BorderFactory.createTitledBorder("Boje"));
+    
+    btnBorderColor = new JButton("Ivica");     // дугме за боју ивице
+    btnFillColor = new JButton("Popuni");      // дугме за боју испуне
+    
+    // ДЕСНИ ДЕО - информације о померању (ЗЕЛЕН!)
+    JPanel selectionPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+    selectionPanel.setBackground(GREEN_COLOR);  // RGB(217,245,213)
+    selectionPanel.setBorder(BorderFactory.createCompoundBorder(
+        BorderFactory.createLineBorder(GREEN_DARK, 1),
+        BorderFactory.createEmptyBorder(8, 20, 8, 20)
+    ));
+    
+    JLabel lblSelectionInfo = new JLabel("⚡ Prevlači za pomeranje | Prevlači ivice za promenu veličine");
+    lblSelectionInfo.setForeground(new Color(40, 80, 30));  // тамно зелена слова
+    
+    return topPanel;
+}
+```
+
+## **ДЕО 4: TOOL PANEL (ЛЕВИ ПАНЕЛ СА АЛАТКАМА)**
+
+```java
+private JPanel createModernToolPanel() {
+    JPanel panel = new JPanel();
+    panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));  // вертикални распоред
+    panel.setBackground(GREEN_COLOR);  // ЦЕО ПАНЕЛ ЈЕ ЗЕЛЕН!
+    
+    JLabel title = new JLabel("ALATI", SwingConstants.CENTER);
+    title.setFont(new Font("Segoe UI", Font.BOLD, 16));
+    title.setForeground(new Color(40, 80, 30));
+    
+    String[] tools = {"✏️ Tačka", "📏 Linija", "⬛ Pravougaonik", "⚪ Krug", "⭕ Krug sa rupom", "🖱️ Selektuj"};
+    
+    for (int i = 0; i < tools.length; i++) {
+        JButton btn = createGreenButton(tools[i]);
+        // ... додај акцију
+        panel.add(btn);
+        panel.add(Box.createRigidArea(new Dimension(0, 8)));  // размак од 8px
+    }
+    
+    // Сепаратор
+    panel.add(new JSeparator());
+    panel.add(Box.createRigidArea(new Dimension(0, 15)));
+    
+    // Акциона дугмад
+    JButton btnModify = createGreenButton("✏️ Izmeni selektovano");
+    JButton btnDelete = createGreenButton("🗑️ Obriši selektovano");
+    JButton btnClear = createGreenButton("🧹 Obriši sve");
+    
+    return panel;
+}
+```
+
+**BoxLayout објашњење:**
+- Поставља компоненте вертикално једна испод друге
+- `Box.createRigidArea()` - прави фиксни простор између компоненти
+- `Box.createVerticalGlue()` - гура компоненте на врх, вишак простора доле
+
+## **ДЕО 5: СТАТУС БАР (ДОЊА ТРАКА)**
+
+```java
+private JPanel createStatusBar() {
+    JPanel panel = new JPanel(new BorderLayout());
+    
+    lblStatus = new JLabel("🔧 Aktivni alat: Tačka");           // тренутни алат
+    lblShapeInfo = new JLabel("ℹ️ Nijedan oblik nije selektovan"); // информације о селекцији
+    JLabel lblCoordinates = new JLabel();                        // координате миша
+    
+    // Праћење покрета миша за приказ координата
+    drawingPanel.addMouseMotionListener(new MouseMotionAdapter() {
+        public void mouseMoved(MouseEvent e) {
+            lblCoordinates.setText(String.format("📍 X: %d, Y: %d", e.getX(), e.getY()));
+        }
+    });
+    
+    return panel;
+}
+```
+
+## **ДЕО 6: ТАСТАТУРНЕ ПРЕЧИЦЕ**
+
+```java
+private void setupKeyboardShortcuts() {
+    KeyboardFocusManager.getCurrentKeyboardFocusManager()
+        .addKeyEventDispatcher(e -> {
+            if (e.getID() == KeyEvent.KEY_PRESSED && e.getKeyCode() == KeyEvent.VK_DELETE) {
+                deleteSelectedShape();  // Delete тастер - брисање
+                return true;
+            }
+            if (e.getID() == KeyEvent.KEY_PRESSED && e.isControlDown() && e.getKeyCode() == KeyEvent.VK_M) {
+                modifySelectedShape();  // Ctrl+M - измена
+                return true;
+            }
+            return false;
+        });
+}
+```
+
+## **ДЕО 7: РУКОВАЊЕ КЛИКОМ НА ПАНЕЛ**
+
+```java
+private void handleCanvasClick(int x, int y) {
+    switch (currentTool) {
+        case "Tačka":
+            drawingPanel.addShape(new PointShape(x, y, currentBorderColor, currentFillColor));
+            break;
+            
+        case "Linija":
+            linePoints.add(new Point(x, y));
+            if (linePoints.size() == 2) {
+                Point p1 = linePoints.get(0);
+                Point p2 = linePoints.get(1);
+                drawingPanel.addShape(new LineShape(p1.x, p1.y, p2.x, p2.y, 
+                                      currentBorderColor, currentFillColor));
+                linePoints.clear();
+            } else {
+                lblStatus.setText("🔧 Linija: Kliknite drugu tačku");
+            }
+            break;
+            
+        case "Pravougaonik":
+            showRectangleDialog(x, y);
+            break;
+            
+        case "Krug":
+            showCircleDialog(x, y);
+            break;
+            
+        case "Krug sa rupom":
+            showHollowCircleDialog(x, y);
+            break;
+    }
+}
+```
+
+---
+
+# 🎯 **КЉУЧНИ КОНЦЕПТИ ЗА ПОЧЕТНИКЕ**
+
+## **1. Шта је наслеђивање (Inheritance)?**
+```java
+public class PointShape extends Shape
+```
+- `PointShape` **јесте** `Shape` (тачка је облик)
+- Наслеђује све променљиве и методе из `Shape`
+- Може додати своје или променити постојеће
+
+## **2. Шта је полиморфизам (Polymorphism)?**
+```java
+Shape selectedShape = new PointShape(10, 20);  // selectedShape је Shape, али показује на PointShape
+```
+- Иста референца (`Shape`) може показивати на различите типове
+- Када позовемо `selectedShape.contains(x,y)`, позива се прави метод за тај тип
+
+## **3. Шта је енкапсулација (Encapsulation)?**
+```java
+private int x, y;                    // подаци су приватни
+public int getX() { return x; }      // приступ преко јавних метода
+public void setX(int x) { this.x = x; }
+```
+- Подаци су сакривени од других класа
+- Приступ је контролисан преко getter и setter метода
+
+## **4. Шта је апстракција (Abstraction)?**
+```java
+public abstract class Shape {
+    public abstract void draw(Graphics g);
+}
+```
+- `Shape` је апстрактан - не може се направити инстанца
+- Само дефинише шта сваки облик **мора** да има
+- Конкретне класе (`PointShape`, `CircleShape`) имплементирају детаље
+
+## **5. Шта је ламбда израз?**
+```java
+pointDraw = (g2d, s) -> {
+    // код за цртање тачке
+};
+```
+- Скраћени начин за писање анонимних класа
+- `(параметри) -> { тело }`
+- Користи се са функционалним интерфејсима
+
+## **6. Шта је ArrayList?**
+```java
+private ArrayList<Shape> shapes = new ArrayList<>();
+shapes.add(shape);      // додавање на крај
+shapes.remove(shape);   // уклањање
+shapes.get(i);          // приступ елементу
+shapes.size();          // број елемената
+```
+- Динамичка листа (расте по потреби)
+- За разлику од обичног низа, нема фиксну величину
+
+---
+
+# 📊 **ТАБЕЛАРНИ ПРЕГЛЕД СВИХ КЛАСА**
+
+| Класа | Тип | Одговорност |
+|-------|-----|-------------|
+| `Main` | Покретач | Стартује апликацију |
+| `DrawingApp` | JFrame | Главни прозор, управља алаткама |
+| `PnlDrawing` | JPanel | Цртање, селекција, трансформације |
+| `Shape` | abstract class | Дефинише заједничке особине облика |
+| `PointShape` | class | Подаци и логика за тачку |
+| `LineShape` | class | Подаци и логика за линију |
+| `RectangleShape` | class | Подаци и логика за правоугаоник |
+| `CircleShape` | class | Подаци и логика за круг |
+| `HollowCircleShape` | class | Подаци и логика за круг са рупом |
+| `ModifyDialog` | JDialog | Дијалог за измену својстава |
+
+---
+
+# 🚀 **ТОК ПРОГРАМА (DATA FLOW)**
+
+## **Креирање тачке:**
+```
+1. Корисник кликне на "Tačka" дугме
+   ↓
+2. DrawingApp.currentTool = "Tačka"
+   ↓
+3. Корисник кликне на панел за цртање
+   ↓
+4. drawingPanel.addShape(new PointShape(x, y, borderColor, fillColor))
+   ↓
+5. PnlDrawing.shapes.add(shape)
+   ↓
+6. PnlDrawing.repaint() → позива paintComponent()
+   ↓
+7. paintComponent() позива pointDraw.draw(g2d, shape)
+   ↓
+8. Тачка се појављује на екрану
+```
+
+## **Селекција облика:**
+```
+1. Корисник кликне на "Selektuj" дугме
+   ↓
+2. Корисник кликне на облик
+   ↓
+3. drawingPanel.selectShapeAt(x, y)
+   ↓
+4. PnlDrawing петља кроз shapes ОД ПОСЛЕДЊЕГ ка првом
+   ↓
+5. shape.contains(x, y) - провера да ли је клик унутар облика
+   ↓
+6. selectedShape = shape
+   ↓
+7. repaint() - црта се border око селектованог облика
+```
+
+## **Померање облика:**
+```
+1. Корисник кликне на облик (са Select алатом)
+   ↓
+2. handleMousePress() - запамти dragStartX, dragStartY
+   ↓
+3. Корисник помера миш
+   ↓
+4. handleMouseDrag() - израчуна deltaX, deltaY
+   ↓
+5. moveShape() - помера облик
+   ↓
+6. repaint() - прецртава на новој позицији
+```
+
+---
+
+Надам се да је ово детаљно објашњење помогло! Ако имаш још питања, слободно питај! 😊
